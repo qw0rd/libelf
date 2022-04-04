@@ -71,6 +71,7 @@ class Elf {
     usize _stream_size{};
     const u8* _stream;
     ElfHeader _header;
+    SectionHeader* _string_tab = nullptr;
 
 public:
     Elf(const u8* data, usize stream_size) : _stream{data}, _stream_size{stream_size} {
@@ -88,6 +89,12 @@ public:
         _header.e_shentsize = _get_16();
         _header.e_shnum = _get_16();
         _header.e_shstrndx = _get_16();
+
+        // get the address of the string table section
+        auto sec_addr = (_header.e_shoff) + (sizeof(SectionHeader) * (_header.e_shstrndx));
+
+        // TODO: dont do UB
+        _string_tab = reinterpret_cast<SectionHeader*>((void*)&_stream[sec_addr]);
     }
 
     const ElfHeader& header() const 
@@ -102,16 +109,9 @@ public:
 
     const char* string(u32 offset) const
     {
-        // get the address of the string table section
-        auto sec_addr = (_header.e_shoff) + (sizeof(SectionHeader) * (_header.e_shstrndx));
-
-        // TODO: dont do UB
-        auto* section = reinterpret_cast<SectionHeader*>((void*)&_stream[sec_addr]);
-
         // the string table address is in `sh_offset` of the section header.
         // add the offset from `sh_name` to get the starting address of the string
-        const char* g = static_cast<const char*>((void*)&_stream[section->sh_offset + offset]);
-        return g;
+        return static_cast<const char*>((void*)&_stream[_string_tab->sh_offset + offset]);
     }
 
 private:
